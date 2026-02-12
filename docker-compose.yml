@@ -1,0 +1,95 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: student_postgres
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    # DevOps: avoid exposing DB broadly; keep it local-only if you need host access
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - student_network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  flyway:
+    image: flyway/flyway:10-alpine
+    platform: linux/amd64   # silence mac arm64 warning
+    container_name: student_flyway
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    command: >
+      -connectRetries=60
+      -url=jdbc:postgresql://db:5432/${POSTGRES_DB}
+      -user=${POSTGRES_USER}
+      -password=${POSTGRES_PASSWORD}
+      -locations=filesystem:/flyway/sql
+      migrate
+
+    volumes:
+      - ./db/migrations:/flyway/sql:ro
+
+    networks:
+      - student_network
+
+
+  api:
+    build: .
+    container_name: student_api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    environment:
+      # inside docker it must use service name "db"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+
+    ports:
+      - "8000:8000"
+
+    networks:
+      - student_network
+
+    command: >
+      sh -c "python -m app.main"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+
+volumes:
+  postgres_data:
+
+networks:
+  student_network:
+    driver: bridge

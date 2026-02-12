@@ -1,7 +1,6 @@
 # app/services/student_service.py
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
-from sqlalchemy.exc import IntegrityError
 
 from app.models.student import Student
 from app.schemas.student import StudentCreate, StudentUpdate

@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Student Registration</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .success {
+      color: green;
+    }
+
+    .error {
+      color: red;
+    }
+
+    pre {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      overflow: auto;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Register Student</h2>
+
+  <form id="form">
+    <input name="first_name" placeholder="First name" required />
+    <input name="last_name" placeholder="Last name" required />
+    <input name="email" type="email" placeholder="Email" required />
+    <input name="phone" placeholder="+33600000000" required />
+    <input name="age" type="number" placeholder="Age" required />
+    <input name="address" placeholder="Address" required />
+    <button type="submit">Register</button>
+  </form>
+
+  <pre id="result">—</pre>
+
+  <script>
+    const form = document.getElementById("form");
+  const result = document.getElementById("result");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    result.className = "";
+    result.textContent = "Submitting...";
+
+    const data = Object.fromEntries(new FormData(form).entries());
+    data.age = Number(data.age);
+
+    try {
+      const res = await fetch("/public/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        result.className = "error";
+        result.textContent = `Registration failed (${res.status}).`;
+        return;
+      }
+
+      // Success — no JSON display
+      result.className = "success";
+      result.textContent = "Registration successful ✔";
+
+      form.reset();
+
+    } catch (err) {
+      result.className = "error";
+      result.textContent = "Network error. Please try again.";
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 from .db import fetch_one, fetch_all
 
+
 def flyway_info(conn):
     # Flyway schema history table is usually: flyway_schema_history
     # If yours uses a custom name/schema, we’ll adjust.
@@ -10,7 +11,7 @@ def flyway_info(conn):
         FROM flyway_schema_history
         ORDER BY installed_rank DESC
         LIMIT 1
-        """
+        """,
     )
     counts = fetch_one(
         conn,
@@ -20,9 +21,10 @@ def flyway_info(conn):
           SUM(CASE WHEN success THEN 0 ELSE 1 END) AS failed,
           COUNT(*) AS total
         FROM flyway_schema_history
-        """
+        """,
     )
     return {"latest": latest, "counts": counts}
+
 
 def flyway_recent(conn, n: int = 10):
     return fetch_all(

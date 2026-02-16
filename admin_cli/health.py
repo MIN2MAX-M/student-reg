@@ -1,5 +1,6 @@
 from .db import fetch_one
 
+
 def db_status(conn):
     return fetch_one(
         conn,
@@ -10,8 +11,9 @@ def db_status(conn):
           inet_server_addr()::text AS server_addr,
           inet_server_port() AS server_port,
           version() AS version
-        """
+        """,
     )
+
 
 def permissions_check(conn):
     # Checks whether current role can CREATE TABLE in public schema (should be FALSE for app_user)
@@ -23,8 +25,9 @@ def permissions_check(conn):
           has_schema_privilege(current_user, 'public', 'USAGE') AS schema_usage,
           has_schema_privilege(current_user, 'public', 'CREATE') AS schema_create,
           has_table_privilege(current_user, 'public.students', 'SELECT,INSERT,UPDATE,DELETE') AS students_crud
-        """
+        """,
     )
+
 
 def seed_status(conn):
     # simple demo: count students; adjust if you tag seed rows

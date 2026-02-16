@@ -1,0 +1,5 @@
+resources:
+  - student-reg-sa.yaml
+  - flyway-sa.yaml
+  - role-readonly.yaml
+  - rolebinding-readonly.yaml

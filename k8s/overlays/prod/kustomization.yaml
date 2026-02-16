@@ -1,0 +1,10 @@
+resources:
+  - ../../base
+  - ingress.yaml
+
+namespace: student-reg-prod
+
+images:
+  - name: ghcr.io/MIN2MAX-M/student-reg
+    newName: ghcr.io/MIN2MAX-M/student-reg
+    newTag: v1.0.0

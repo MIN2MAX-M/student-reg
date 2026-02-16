@@ -1,0 +1,10 @@
+configMapGenerator:
+  - name: flyway-migrations
+    files:
+      - V1__create_students.sql=migrations/V1__create_students.sql
+      - V2__updated_at_trigger.sql=migrations/V2__updated_at_trigger.sql
+generatorOptions:
+  disableNameSuffixHash: true
+
+resources:
+  - job.yaml

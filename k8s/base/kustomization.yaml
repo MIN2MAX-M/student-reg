@@ -1,0 +1,16 @@
+resources:
+  - namespace.yaml
+  - rbac
+  - networkpolicies
+
+  - postgres/secret.yaml
+  - postgres/service.yaml
+  - postgres/service-headless.yaml
+  - postgres/statefulset.yaml
+  - postgres/pdb.yaml
+
+  - app/deployment.yaml
+  - app/svc.yaml
+  - app/pdb.yaml
+
+  - flyway

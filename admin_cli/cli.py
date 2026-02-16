@@ -27,6 +27,7 @@ def main():
 # Students commands
 # -----------------------
 
+
 @students.command("list")
 def students_list(
     limit: int = typer.Option(20, "--limit", "-l", help="Max rows to return"),
@@ -63,12 +64,16 @@ def students_create(
     first_name: str = typer.Argument(..., help="First name"),
     last_name: str = typer.Argument(..., help="Last name"),
     email: str = typer.Argument(..., help="Email address"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Don't write; only show what would happen"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Don't write; only show what would happen"
+    ),
 ):
     # IMPORTANT: dry-run should NOT require DB connectivity
     if dry_run:
         console.print("[yellow]DRY RUN:[/yellow] would create student")
-        console.print({"first_name": first_name, "last_name": last_name, "email": email})
+        console.print(
+            {"first_name": first_name, "last_name": last_name, "email": email}
+        )
         raise typer.Exit(code=0)
 
     s = load_settings()
@@ -90,7 +95,9 @@ def students_update(
     first_name: str | None = typer.Option(None, "--first-name", help="New first name"),
     last_name: str | None = typer.Option(None, "--last-name", help="New last name"),
     email: str | None = typer.Option(None, "--email", help="New email"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Don't write; only show what would happen"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Don't write; only show what would happen"
+    ),
 ):
     s = load_settings()
     with get_conn(s) as conn:
@@ -119,7 +126,9 @@ def students_update(
             raise typer.Exit(code=0)
 
         try:
-            after = students_mod.update_student(conn, student_id, first_name, last_name, email)
+            after = students_mod.update_student(
+                conn, student_id, first_name, last_name, email
+            )
             conn.commit()
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
@@ -161,6 +170,7 @@ def students_delete(
 # Ops commands
 # -----------------------
 
+
 @ops.command("db-status")
 def ops_db_status():
     s = load_settings()
@@ -179,7 +189,9 @@ def ops_permissions_check():
 
     # Expect schema_create = False for app_user
     if info and info.get("schema_create") is True:
-        console.print("[red]WARNING:[/red] app_user can CREATE in schema public (not hardened).")
+        console.print(
+            "[red]WARNING:[/red] app_user can CREATE in schema public (not hardened)."
+        )
         raise typer.Exit(code=1)
 
 
@@ -203,7 +215,7 @@ def ops_flyway_info():
 
 @ops.command("flyway-recent")
 def ops_flyway_recent(
-    n: int = typer.Option(10, "--n", help="How many recent migrations to show")
+    n: int = typer.Option(10, "--n", help="How many recent migrations to show"),
 ):
     s = load_settings()
     with get_conn(s) as conn:

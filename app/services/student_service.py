@@ -28,7 +28,9 @@ def list_students(db: Session, limit: int = 50, offset: int = 0) -> list[Student
     return list(db.execute(stmt).scalars().all())
 
 
-def search_students(db: Session, q: str, limit: int = 50, offset: int = 0) -> list[Student]:
+def search_students(
+    db: Session, q: str, limit: int = 50, offset: int = 0
+) -> list[Student]:
     like = f"%{q.strip()}%"
     stmt = (
         select(Student)

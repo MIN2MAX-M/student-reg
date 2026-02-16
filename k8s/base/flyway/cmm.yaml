@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flyway-migrations
+data:
+  V1__create_students.sql: |
+    -- paste contents of db/migrations/V1__create_students.sql here
+  V2__updated_at_trigger.sql: |
+    -- paste contents of db/migrations/V2__updated_at_trigger.sql here

@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: student-reg
+  namespace: student-reg
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["student-reg.example.com"]
+      secretName: student-reg-tls
+  rules:
+    - host: student-reg.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: student-reg
+                port:
+                  number: 80

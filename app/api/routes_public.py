@@ -8,6 +8,8 @@ from app.services import student_service
 router = APIRouter(prefix="/public", tags=["public"])
 
 
-@router.post("/register", response_model=StudentOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=StudentOut, status_code=status.HTTP_201_CREATED
+)
 def register_student(payload: StudentCreate, db: Session = Depends(get_db)):
     return student_service.create_student(db, payload)

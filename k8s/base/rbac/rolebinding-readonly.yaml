@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: student-reg-readonly
+subjects:
+  - kind: ServiceAccount
+    name: student-reg-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: student-reg-readonly

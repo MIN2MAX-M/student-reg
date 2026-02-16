@@ -3,6 +3,7 @@ from rich.console import Console
 
 console = Console()
 
+
 def render_table(rows: list[dict], title: str):
     table = Table(title=title, show_lines=False)
     if not rows:
@@ -16,6 +17,7 @@ def render_table(rows: list[dict], title: str):
         table.add_row(*[str(r.get(c, "")) for c in rows[0].keys()])
 
     console.print(table)
+
 
 def render_kv(title: str, d: dict | None):
     console.print(f"[bold]{title}[/bold]")

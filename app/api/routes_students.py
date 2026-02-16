@@ -35,7 +35,9 @@ def list_(
     db: Session = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    q: str | None = Query(default=None, description="Search query (name/email/phone/address)"),
+    q: str | None = Query(
+        default=None, description="Search query (name/email/phone/address)"
+    ),
 ):
     if q:
         return student_service.search_students(db, q=q, limit=limit, offset=offset)
@@ -50,7 +52,9 @@ def get_one(student_id: int, db: Session = Depends(get_db)):
     return student
 
 
-@router.patch("/{student_id}", response_model=StudentOut, dependencies=[Depends(require_admin)])
+@router.patch(
+    "/{student_id}", response_model=StudentOut, dependencies=[Depends(require_admin)]
+)
 def update(student_id: int, payload: StudentUpdate, db: Session = Depends(get_db)):
     student = student_service.get_student(db, student_id)
     if not student:

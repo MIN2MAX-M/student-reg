@@ -5,11 +5,12 @@ on:
   push:
     branches: ["main"]
 
+# Default to least privilege; grant extra per-job where needed.
 permissions:
-  contents: write          # needed to commit GitOps overlay updates
-  packages: write          # push to GHCR
-  security-events: write   # upload SARIF
-  id-token: write          # keyless cosign
+  contents: read
+  packages: write          # push to GHCR (job-scoped still ok)
+  security-events: write   # upload SARIF (job-scoped still ok)
+  id-token: write          # keyless cosign (job-scoped still ok)
   actions: read
 
 concurrency:
@@ -28,22 +29,22 @@ jobs:
     name: CodeQL (SAST)
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      actions: read
       contents: read
+      actions: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: python
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
 
   # -----------------------------------------
   # 2) Secrets scanning + IaC/K8s scanning
@@ -53,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +62,7 @@ jobs:
       - name: Gitleaks (secrets scan)
         uses: gitleaks/gitleaks-action@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           fail: true
 
@@ -73,10 +75,11 @@ jobs:
           output_file_path: results/checkov.sarif
           soft_fail: true
 
+      # Checkov writes SARIF as: results/checkov.sarif/results_sarif.sarif
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: results/checkov.sarif
+          sarif_file: results/checkov.sarif/results_sarif.sarif
 
   # --------------------------
   # 3) Lint + Unit tests
@@ -85,6 +88,8 @@ jobs:
     name: Lint + Tests
     runs-on: ${{ matrix.os }}
     needs: [codeql, security-scans]
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -120,6 +125,7 @@ jobs:
     needs: lint-test
     permissions:
       contents: read
+      actions: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +143,7 @@ jobs:
             --failOnCVSS 9
 
       - name: Upload ODC SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: odc-reports/dependency-check-report.sarif
 
@@ -152,6 +158,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: read
       security-events: write
       id-token: write
     outputs:
@@ -187,7 +194,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       # PR build (no push)
       - name: Build image (no push on PR)
@@ -231,7 +238,7 @@ jobs:
 
       - name: Upload Trivy SARIF (main only)
         if: steps.meta.outputs.pushed == 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif
 
@@ -280,6 +287,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-image
     if: needs.build-image.outputs.pushed == 'true'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:

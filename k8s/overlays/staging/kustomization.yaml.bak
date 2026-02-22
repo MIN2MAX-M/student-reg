@@ -4,6 +4,6 @@ resources:
 namespace: student-reg-staging
 
 images:
-  - name: ghcr.io/min2max-m/student-reg
+  - name: ghcr.io/MIN2MAX-M/student-reg
     newName: ghcr.io/min2max-m/student-reg
     newTag: v1.0.0-rc1

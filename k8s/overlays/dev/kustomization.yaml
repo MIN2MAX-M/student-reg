@@ -5,5 +5,5 @@ namespace: student-reg-dev
 
 images:
   - name: ghcr.io/MIN2MAX-M/student-reg
-    newName: ghcr.io/MIN2MAX-M/student-reg
-    newTag: sha-PLACEHOLDER
+    newName: ghcr.io/min2max-m/student-reg
+    newTag: sha-381acee

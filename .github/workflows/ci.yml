@@ -20,7 +20,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.11"
-  IMAGE_REPO: "ghcr.io/MIN2MAX-M/student-reg"
 
 jobs:
   # -------------------------
@@ -80,7 +79,7 @@ jobs:
 
       # Checkov SARIF output will be: results/results_sarif.sarif
       - name: Upload Checkov SARIF
-        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results/results_sarif.sarif
@@ -147,7 +146,7 @@ jobs:
             --failOnCVSS 9
 
       - name: Upload ODC SARIF
-        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: odc-reports/dependency-check-report.sarif
@@ -179,9 +178,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           SHORT_SHA="${GITHUB_SHA::7}"
+
+          # GHCR requires lowercase names; normalize owner + repo
+          OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
+
           echo "tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "image=${{ env.IMAGE_REPO }}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
@@ -244,7 +251,7 @@ jobs:
 
       - name: Upload Trivy SARIF (main only)
         if: steps.meta.outputs.pushed == 'true'
-        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif

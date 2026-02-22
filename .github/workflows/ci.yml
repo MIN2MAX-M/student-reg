@@ -77,8 +77,8 @@ jobs:
           output_file_path: results
           soft_fail: true
 
-      # Checkov SARIF output will be: results/results_sarif.sarif
       - name: Upload Checkov SARIF
+        if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -121,6 +121,7 @@ jobs:
 
   # ------------------------------------------------------------
   # 4) Dependency scanning (Python deps) via OWASP Dependency-Check
+  #    - Auto-detect SARIF path and upload if present
   # ------------------------------------------------------------
   dependency-scan:
     name: Dependency scan (OWASP DC)
@@ -145,11 +146,36 @@ jobs:
             --scan .
             --failOnCVSS 9
 
+      - name: Locate ODC SARIF
+        id: odc_sarif
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Listing odc-reports (if it exists):"
+          ls -la odc-reports || true
+
+          # Find the first SARIF-like file produced by ODC
+          FILE="$(find odc-reports -maxdepth 4 -type f \( -name "*.sarif" -o -name "*.sarif.json" \) | head -n 1 || true)"
+
+          if [[ -z "${FILE}" ]]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "file=" >> "$GITHUB_OUTPUT"
+            echo "No SARIF found under odc-reports."
+            echo "Searching repository for any SARIF files:"
+            find . -maxdepth 5 -type f \( -name "*.sarif" -o -name "*.sarif.json" \) -print || true
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "file=${FILE}" >> "$GITHUB_OUTPUT"
+            echo "Found SARIF: ${FILE}"
+          fi
+
       - name: Upload ODC SARIF
+        if: steps.odc_sarif.outputs.found == 'true'
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: odc-reports/dependency-check-report.sarif
+          sarif_file: ${{ steps.odc_sarif.outputs.file }}
 
   # ----------------------------------------------------
   # 5) Build image (PR + main), push only on main

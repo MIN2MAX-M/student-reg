@@ -6,7 +6,7 @@ namespace: student-reg-dev
 images:
   - name: ghcr.io/MIN2MAX-M/student-reg
     newName: ghcr.io/min2max-m/student-reg
-    newTag: sha-381acee
+    newTag: sha-0af6a28
 
 patches:
   - target:

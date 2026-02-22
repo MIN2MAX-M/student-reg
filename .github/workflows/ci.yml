@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: ["main"]
+  workflow_dispatch: {}
 
 # Default to least privilege; grant extra per-job where needed.
 permissions:
@@ -48,7 +49,6 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@v4
 
-
   # -----------------------------------------
   # 2) Secrets scanning + IaC/K8s scanning
   # -----------------------------------------
@@ -80,11 +80,10 @@ jobs:
 
       # Checkov SARIF output will be: results/results_sarif.sarif
       - name: Upload Checkov SARIF
-        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
+        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results/results_sarif.sarif
-
 
   # --------------------------
   # 3) Lint + Unit tests
@@ -121,7 +120,6 @@ jobs:
       - name: Tests (pytest)
         run: pytest --maxfail=1 --disable-warnings
 
-
   # ------------------------------------------------------------
   # 4) Dependency scanning (Python deps) via OWASP Dependency-Check
   # ------------------------------------------------------------
@@ -149,11 +147,10 @@ jobs:
             --failOnCVSS 9
 
       - name: Upload ODC SARIF
-        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
+        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: odc-reports/dependency-check-report.sarif
-
 
   # ----------------------------------------------------
   # 5) Build image (PR + main), push only on main
@@ -181,13 +178,14 @@ jobs:
         id: meta
         shell: bash
         run: |
+          set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::7}"
-          echo "tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "image=${{ env.IMAGE_REPO }}" >> $GITHUB_OUTPUT
+          echo "tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ env.IMAGE_REPO }}" >> "$GITHUB_OUTPUT"
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            echo "pushed=true" >> $GITHUB_OUTPUT
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "pushed=false" >> $GITHUB_OUTPUT
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up QEMU
@@ -246,7 +244,7 @@ jobs:
 
       - name: Upload Trivy SARIF (main only)
         if: steps.meta.outputs.pushed == 'true'
-        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
+        continue-on-error: true   # safe even after enabling Code Scanning; remove if you want strict uploads
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif
@@ -277,6 +275,7 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
+          set -euo pipefail
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign sign --yes "${IMAGE}"
 
@@ -285,9 +284,9 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
+          set -euo pipefail
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
-
 
   # -------------------------------------------------------
   # 6) GitOps CD: update dev overlay tag (main only)
@@ -307,6 +306,7 @@ jobs:
       - name: Update dev overlay image + tag
         shell: bash
         run: |
+          set -euo pipefail
           FILE="k8s/overlays/dev/kustomization.yaml"
           echo "Updating ${FILE} newName -> ${{ needs.build-image.outputs.image }}"
           echo "Updating ${FILE} newTag  -> ${{ needs.build-image.outputs.tag }}"
@@ -325,6 +325,7 @@ jobs:
 
       - name: Commit & push overlay update
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/overlays/dev/kustomization.yaml

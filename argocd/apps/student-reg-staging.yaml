@@ -13,8 +13,4 @@ spec:
     server: https://kubernetes.default.svc
     namespace: student-reg-staging
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+    automated:{}

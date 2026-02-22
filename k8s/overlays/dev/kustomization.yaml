@@ -6,4 +6,19 @@ namespace: student-reg-dev
 images:
   - name: ghcr.io/MIN2MAX-M/student-reg
     newName: ghcr.io/min2max-m/student-reg
-    newTag: sha-f85fa58
+    newTag: sha-381acee
+
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: StatefulSet
+      name: postgres
+    patch: |-
+      - op: add
+        path: /spec/volumeClaimTemplates/0/spec/selector
+        value:
+          matchLabels:
+            app: student-reg
+            env: dev
+            tier: db

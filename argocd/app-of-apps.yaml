@@ -9,11 +9,11 @@ spec:
   source:
     repoURL: https://github.com/MIN2MAX-M/student-reg.git
     targetRevision: main
-    path: k8s/overlays/dev
+    path: argocd/apps
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: student-reg-dev
+    namespace: argocd
 
   syncPolicy:
     automated:

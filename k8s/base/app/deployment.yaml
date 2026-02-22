@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: student-reg
-  namespace: student-reg
   labels:
     app: student-reg
 spec:
@@ -67,6 +66,8 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
             capabilities:
               drop: ["ALL"]
           volumeMounts:

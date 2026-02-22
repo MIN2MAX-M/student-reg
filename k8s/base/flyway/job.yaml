@@ -2,7 +2,6 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: flyway-migrate
-  namespace: student-reg
 spec:
   backoffLimit: 3
   template:
@@ -37,13 +36,19 @@ spec:
             - name: migrations
               mountPath: /flyway/sql
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             capabilities:
               drop: ["ALL"]
       volumes:
         - name: migrations
           configMap:
             name: flyway-migrations
+        - name: tmp
+          emptyDir: {}

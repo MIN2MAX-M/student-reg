@@ -10,11 +10,16 @@ permissions:
   packages: write
   id-token: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   IMAGE_REPO: "ghcr.io/MIN2MAX-M/student-reg"
 
 jobs:
   release:
+    name: Promote tag -> staging/prod
     runs-on: ubuntu-latest
 
     steps:
@@ -22,21 +27,31 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Determine version + target env
+      - name: Determine version + target overlay
         id: meta
         shell: bash
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"     # e.g. v1.2.0 or v1.2.0-rc1
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "image=${{ env.IMAGE_REPO }}" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
-          if [[ "$TAG" == *"-rc"* ]]; then
-            echo "overlay=staging" >> $GITHUB_OUTPUT
-            echo "tags=${{ env.IMAGE_REPO }}:${TAG}" >> $GITHUB_OUTPUT
+          TAG="${GITHUB_REF#refs/tags/}"     # e.g. v1.2.0 or v1.2.0-rc1
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ env.IMAGE_REPO }}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${TAG}" == *"-rc"* ]]; then
+            OVERLAY="staging"
+            TAGS="${{ env.IMAGE_REPO }}:${TAG}"
           else
-            echo "overlay=prod" >> $GITHUB_OUTPUT
-            echo "tags=${{ env.IMAGE_REPO }}:${TAG},${{ env.IMAGE_REPO }}:latest" >> $GITHUB_OUTPUT
+            OVERLAY="prod"
+            TAGS="${{ env.IMAGE_REPO }}:${TAG},${{ env.IMAGE_REPO }}:latest"
           fi
+
+          echo "overlay=${OVERLAY}" >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved:"
+          echo "  TAG=${TAG}"
+          echo "  OVERLAY=${OVERLAY}"
+          echo "  TAGS=${TAGS}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -49,7 +64,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
 
       - name: Build & push (multi-arch)
         id: buildpush
@@ -72,10 +87,17 @@ jobs:
           format: spdx-json
           output-file: sbom.spdx.json
 
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ steps.meta.outputs.tag }}
+          path: sbom.spdx.json
+
       - name: Cosign sign image by digest
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
+          set -euo pipefail
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign sign --yes "${IMAGE}"
 
@@ -83,12 +105,15 @@ jobs:
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
+          set -euo pipefail
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
 
       - name: Update GitOps overlay (staging/prod)
         shell: bash
         run: |
+          set -euo pipefail
+
           OVERLAY="${{ steps.meta.outputs.overlay }}"
           FILE="k8s/overlays/${OVERLAY}/kustomization.yaml"
           TAG="${{ steps.meta.outputs.tag }}"
@@ -98,22 +123,45 @@ jobs:
           echo "newName -> ${{ steps.meta.outputs.image }}"
           echo "newTag  -> ${TAG}"
 
-          # newName
+          if [[ ! -f "$FILE" ]]; then
+            echo "ERROR: overlay file not found: $FILE"
+            exit 1
+          fi
+
+          # Update newName if present (optional)
           if grep -qE "^[[:space:]]*newName:" "$FILE"; then
             sed -i.bak -E "s|^([[:space:]]*newName:).*|\1 ${{ steps.meta.outputs.image }}|" "$FILE"
           fi
-          # newTag
-          sed -i.bak -E "s|^([[:space:]]*newTag:).*|\1 ${TAG}|" "$FILE"
+
+          # Update newTag (expected to exist)
+          if grep -qE "^[[:space:]]*newTag:" "$FILE"; then
+            sed -i.bak -E "s|^([[:space:]]*newTag:).*|\1 ${TAG}|" "$FILE"
+          else
+            echo "ERROR: newTag not found in $FILE (expected Kustomize images block)."
+            echo "Tip: ensure you have something like:"
+            echo "images:"
+            echo "- name: student-reg"
+            echo "  newName: ghcr.io/MIN2MAX-M/student-reg"
+            echo "  newTag: dev"
+            exit 1
+          fi
+
           rm -f "$FILE.bak"
 
+          echo "Result:"
           grep -nE "newName:|newTag:" "$FILE" || true
 
       - name: Commit & push overlay update
+        shell: bash
         run: |
+          set -euo pipefail
+
           OVERLAY="${{ steps.meta.outputs.overlay }}"
           TAG="${{ steps.meta.outputs.tag }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/${OVERLAY}/kustomization.yaml
+
+          git add "k8s/overlays/${OVERLAY}/kustomization.yaml"
           git commit -m "chore(gitops): promote ${OVERLAY} ${TAG}" || exit 0
           git push

@@ -34,6 +34,8 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -45,6 +47,7 @@ jobs:
 
       - name: Analyze
         uses: github/codeql-action/analyze@v4
+
 
   # -----------------------------------------
   # 2) Secrets scanning + IaC/K8s scanning
@@ -58,13 +61,13 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Gitleaks (secrets scan)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          fail: true
 
       - name: Checkov (K8s/IaC scan) -> SARIF
         uses: bridgecrewio/checkov-action@v12
@@ -72,14 +75,16 @@ jobs:
           directory: .
           framework: kubernetes
           output_format: sarif
-          output_file_path: results/checkov.sarif
+          output_file_path: results
           soft_fail: true
 
-      # Checkov writes SARIF as: results/checkov.sarif/results_sarif.sarif
+      # Checkov SARIF output will be: results/results_sarif.sarif
       - name: Upload Checkov SARIF
+        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: results/checkov.sarif/results_sarif.sarif
+          sarif_file: results/results_sarif.sarif
+
 
   # --------------------------
   # 3) Lint + Unit tests
@@ -116,6 +121,7 @@ jobs:
       - name: Tests (pytest)
         run: pytest --maxfail=1 --disable-warnings
 
+
   # ------------------------------------------------------------
   # 4) Dependency scanning (Python deps) via OWASP Dependency-Check
   # ------------------------------------------------------------
@@ -143,9 +149,11 @@ jobs:
             --failOnCVSS 9
 
       - name: Upload ODC SARIF
+        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: odc-reports/dependency-check-report.sarif
+
 
   # ----------------------------------------------------
   # 5) Build image (PR + main), push only on main
@@ -238,6 +246,7 @@ jobs:
 
       - name: Upload Trivy SARIF (main only)
         if: steps.meta.outputs.pushed == 'true'
+        continue-on-error: true   # remove once Code Scanning is enabled in repo settings
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif
@@ -278,6 +287,7 @@ jobs:
         run: |
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
+
 
   # -------------------------------------------------------
   # 6) GitOps CD: update dev overlay tag (main only)

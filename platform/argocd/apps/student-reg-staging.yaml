@@ -1,20 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: student-reg-dev
+  name: student-reg-staging
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://github.com/MIN2MAX-M/student-reg.git
     targetRevision: main
-    path: k8s/overlays/dev
+    path: apps/student-reg/k8s/overlays/staging
   destination:
     server: https://kubernetes.default.svc
-    namespace: student-reg-dev
+    namespace: student-reg-staging
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+    automated:{}

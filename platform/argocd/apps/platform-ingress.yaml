@@ -1,20 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: student-reg
+  name: platform-ingress
   namespace: argocd
 spec:
   project: default
-
   source:
     repoURL: https://github.com/MIN2MAX-M/student-reg.git
     targetRevision: main
-    path: argocd/apps
-
+    path: platform/ingress
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-
   syncPolicy:
     automated:
       prune: true

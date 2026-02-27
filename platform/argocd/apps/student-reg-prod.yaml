@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: student-reg-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MIN2MAX-M/student-reg.git
+    targetRevision: main
+    path: apps/student-reg/k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: student-reg-prod
+  syncPolicy: {}

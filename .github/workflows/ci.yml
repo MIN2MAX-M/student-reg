@@ -6,12 +6,11 @@ on:
     branches: ["main"]
   workflow_dispatch: {}
 
-# Default to least privilege; grant extra per-job where needed.
 permissions:
   contents: read
-  packages: write          # push to GHCR (job-scoped still ok)
-  security-events: write   # upload SARIF (job-scoped still ok)
-  id-token: write          # keyless cosign (job-scoped still ok)
+  packages: write
+  security-events: write
+  id-token: write
   actions: read
 
 concurrency:
@@ -110,18 +109,22 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r src/requirements.txt
           pip install ruff pytest
 
+      - name: Ensure src on PYTHONPATH
+        shell: bash
+        run: |
+          echo "PYTHONPATH=${GITHUB_WORKSPACE}/src" >> "$GITHUB_ENV"
+
       - name: Lint (ruff)
-        run: ruff check .
+        run: ruff check src
 
       - name: Tests (pytest)
-        run: pytest --maxfail=1 --disable-warnings
+        run: pytest -q src/tests --maxfail=1 --disable-warnings
 
   # ------------------------------------------------------------
   # 4) Dependency scanning (Python deps) via OWASP Dependency-Check
-  #    - Auto-detect SARIF path and upload if present
   # ------------------------------------------------------------
   dependency-scan:
     name: Dependency scan (OWASP DC)
@@ -155,7 +158,6 @@ jobs:
           echo "Listing odc-reports (if it exists):"
           ls -la odc-reports || true
 
-          # Find the first SARIF-like file produced by ODC
           FILE="$(find odc-reports -maxdepth 4 -type f \( -name "*.sarif" -o -name "*.sarif.json" \) | head -n 1 || true)"
 
           if [[ -z "${FILE}" ]]; then
@@ -179,7 +181,6 @@ jobs:
 
   # ----------------------------------------------------
   # 5) Build image (PR + main), push only on main
-  #    + Trivy + SBOM + Sign + Attestation
   # ----------------------------------------------------
   build-image:
     name: Build image (PR/main)
@@ -204,10 +205,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           SHORT_SHA="${GITHUB_SHA::7}"
 
-          # GHCR requires lowercase names; normalize owner + repo
           OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           REPO_LOWER="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
           IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
@@ -240,7 +239,8 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: apps/student-reg
+          file: apps/student-reg/Dockerfile
           push: false
           platforms: linux/amd64,linux/arm64
           tags: |
@@ -254,7 +254,8 @@ jobs:
         if: steps.meta.outputs.pushed == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: apps/student-reg
+          file: apps/student-reg/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
@@ -263,7 +264,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Trivy image scan (main only - must reference a pushed image)
       - name: Trivy image scan -> SARIF (main only)
         if: steps.meta.outputs.pushed == 'true'
         uses: aquasecurity/trivy-action@0.24.0
@@ -282,7 +282,6 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
 
-      # SBOM (main only - for pushed image)
       - name: Generate SBOM (Syft) (main only)
         if: steps.meta.outputs.pushed == 'true'
         uses: anchore/sbom-action@v0
@@ -298,7 +297,6 @@ jobs:
           name: sbom-spdx
           path: sbom.spdx.json
 
-      # Cosign (main only)
       - name: Install Cosign (main only)
         if: steps.meta.outputs.pushed == 'true'
         uses: sigstore/cosign-installer@v3.5.0
@@ -340,16 +338,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FILE="k8s/overlays/dev/kustomization.yaml"
+          FILE="apps/student-reg/k8s/overlays/dev/kustomization.yaml"
           echo "Updating ${FILE} newName -> ${{ needs.build-image.outputs.image }}"
           echo "Updating ${FILE} newTag  -> ${{ needs.build-image.outputs.tag }}"
 
-          # Update newName (or insert if missing)
           if grep -qE "^[[:space:]]*newName:" "$FILE"; then
             sed -i.bak -E "s|^([[:space:]]*newName:).*|\1 ${{ needs.build-image.outputs.image }}|" "$FILE"
           fi
 
-          # Update newTag
           sed -i.bak -E "s|^([[:space:]]*newTag:).*|\1 ${{ needs.build-image.outputs.tag }}|" "$FILE"
           rm -f "$FILE.bak"
 
@@ -361,6 +357,6 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/overlays/dev/kustomization.yaml
+          git add apps/student-reg/k8s/overlays/dev/kustomization.yaml
           git commit -m "chore(gitops): deploy dev ${{ needs.build-image.outputs.tag }}" || exit 0
           git push

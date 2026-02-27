@@ -73,7 +73,7 @@ jobs:
         id: buildpush
         uses: docker/build-push-action@v6
         with:
-          context: apps/student-reg
+          context: .
           file: apps/student-reg/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64

@@ -7,4 +7,4 @@ namespace: student-reg-dev
 images:
   - name: ghcr.io/min2max-m/student-reg
     newName: ghcr.io/min2max-m/student-reg
-    newTag: sha-a2b0a80
+    newTag: sha-b8b3da2

@@ -8,18 +8,3 @@ images:
   - name: ghcr.io/min2max-m/student-reg
     newName: ghcr.io/min2max-m/student-reg
     newTag: sha-a2b0a80
-
-patches:
-  - target:
-      group: apps
-      version: v1
-      kind: StatefulSet
-      name: postgres
-    patch: |-
-      - op: add
-        path: /spec/volumeClaimTemplates/0/spec/selector
-        value:
-          matchLabels:
-            app: student-reg
-            env: dev
-            tier: db

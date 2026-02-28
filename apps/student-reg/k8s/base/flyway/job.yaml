@@ -3,11 +3,19 @@ kind: Job
 metadata:
   name: flyway-migrate
   annotations:
-    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,HookFailed
 spec:
   backoffLimit: 3
+  # Prevent "Terminating for hours" situations
+  activeDeadlineSeconds: 600
+  # Cleanup pods once finished (K8s >= 1.21)
+  ttlSecondsAfterFinished: 300
   template:
+    metadata:
+      labels:
+        app: flyway
+        job-name: flyway-migrate
     spec:
       serviceAccountName: flyway-sa
       automountServiceAccountToken: false

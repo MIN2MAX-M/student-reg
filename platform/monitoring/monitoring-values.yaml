@@ -4,7 +4,6 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: longhorn
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -13,7 +12,6 @@ prometheus:
 grafana:
   persistence:
     enabled: true
-    storageClassName: longhorn
     accessModes: ["ReadWriteOnce"]
     size: 5Gi
 
@@ -22,7 +20,6 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: longhorn
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:

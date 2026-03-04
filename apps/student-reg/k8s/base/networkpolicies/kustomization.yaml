@@ -4,3 +4,4 @@ resources:
   - allow-app-to-postgres.yaml
   - allow-flyway-egress-to-postgres.yaml
   - allow-postgres-from-flyway.yaml
+  - allow-student-reg-egress-to-postgres.yaml

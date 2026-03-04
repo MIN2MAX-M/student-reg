@@ -5,3 +5,4 @@ resources:
   - allow-flyway-egress-to-postgres.yaml
   - allow-postgres-from-flyway.yaml
   - allow-student-reg-egress-to-postgres.yaml
+  - allow-student-reg-from-ingress-nginx.yaml

@@ -2,3 +2,5 @@ resources:
   - default-deny.yaml
   - allow-dns.yaml
   - allow-app-to-postgres.yaml
+  - allow-flyway-egress-to-postgres.yaml
+  - allow-postgres-from-flyway.yaml

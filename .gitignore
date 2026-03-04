@@ -29,3 +29,6 @@ build/
 # Logs
 *.log
 *.bak
+
+# local debug dumps
+_dump/

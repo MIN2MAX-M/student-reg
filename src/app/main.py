@@ -4,14 +4,18 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from app.api.routes_public import router as public_router
+from prometheus_fastapi_instrumentator import Instrumentator   # 👈 ADD THIS
 
+from app.api.routes_public import router as public_router
 from app.api.routes_students import router as students_router
 from app.core.config import settings
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.APP_NAME)
+
+    # 👇 ADD THIS (enable Prometheus metrics)
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
     # API routes
     app.include_router(students_router)
@@ -20,7 +24,7 @@ def create_app() -> FastAPI:
     # Static GUI (end-user registration page)
     base_dir = Path(__file__).resolve().parent
     static_dir = base_dir / "static"
-    static_dir.mkdir(parents=True, exist_ok=True)  # ensures folder exists
+    static_dir.mkdir(parents=True, exist_ok=True)
 
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 

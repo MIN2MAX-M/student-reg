@@ -2,4 +2,12 @@ resources:
   - cmm.yaml
   - flyway-sa.yaml
   - job.yaml
-  - migrations
+
+configMapGenerator:
+  - name: flyway-migrations
+    files:
+      - migrations/V1__create_students.sql
+      - migrations/V2__updated_at_trigger.sql
+
+generatorOptions:
+  disableNameSuffixHash: true

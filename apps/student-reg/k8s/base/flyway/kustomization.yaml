@@ -1,5 +1,4 @@
 resources:
-  - cmm.yaml
   - flyway-sa.yaml
   - job.yaml
 

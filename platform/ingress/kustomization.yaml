@@ -2,3 +2,4 @@ resources:
   - argocd.ingress.yaml
   - grafana.ingress.yaml
   - kiali.ingress.yaml
+  - namespace-istio-system.yaml

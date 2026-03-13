@@ -16,51 +16,51 @@ concurrency:
 
 jobs:
   release:
-    name: Promote tag -> staging/prod
+    name: Promote existing CI artifact -> staging/prod
     runs-on: ubuntu-latest
+    environment: ${{ contains(github.ref_name, '-rc') && 'staging' || 'prod' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: Determine version + target overlay
+      - name: Determine version, source image, and target overlay
         id: meta
         shell: bash
         run: |
           set -euo pipefail
 
-          TAG="${GITHUB_REF#refs/tags/}"     # e.g. v1.2.0 or v1.2.0-rc1
+          TAG="${GITHUB_REF#refs/tags/}"      # e.g. v1.2.0 or v1.2.0-rc1
+          SHORT_SHA="${GITHUB_SHA::7}"        # tag target commit short sha
 
           OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           REPO_LOWER="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
           IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
 
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          SOURCE_TAG="sha-${SHORT_SHA}"
 
           if [[ "${TAG}" == *"-rc"* ]]; then
             OVERLAY="staging"
-            TAGS="${IMAGE}:${TAG}"
+            EXTRA_TAGS="${IMAGE}:${TAG}"
           else
             OVERLAY="prod"
-            TAGS="${IMAGE}:${TAG},${IMAGE}:latest"
+            EXTRA_TAGS="${IMAGE}:${TAG},${IMAGE}:latest"
           fi
 
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "source_tag=${SOURCE_TAG}" >> "$GITHUB_OUTPUT"
           echo "overlay=${OVERLAY}" >> "$GITHUB_OUTPUT"
-          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "extra_tags=${EXTRA_TAGS}" >> "$GITHUB_OUTPUT"
 
           echo "Resolved:"
           echo "  TAG=${TAG}"
           echo "  IMAGE=${IMAGE}"
+          echo "  SOURCE_TAG=${SOURCE_TAG}"
           echo "  OVERLAY=${OVERLAY}"
-          echo "  TAGS=${TAGS}"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+          echo "  EXTRA_TAGS=${EXTRA_TAGS}"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -69,49 +69,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build & push (multi-arch)
-        id: buildpush
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/student-reg/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify CI-built source image exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect \
+            "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.source_tag }}" >/dev/null
+
+      - name: Promote existing image by retagging
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE="${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.source_tag }}"
+          IFS=',' read -ra TARGETS <<< "${{ steps.meta.outputs.extra_tags }}"
+
+          ARGS=()
+          for target in "${TARGETS[@]}"; do
+            ARGS+=("-t" "$target")
+          done
+
+          docker buildx imagetools create "${ARGS[@]}" "$SOURCE"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.5.0
 
-      - name: Generate SBOM (Syft)
-        uses: anchore/sbom-action@v0
-        with:
-          image: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-          format: spdx-json
-          output-file: sbom.spdx.json
+      - name: Resolve promoted image digest
+        id: digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIGEST="$(docker buildx imagetools inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Resolved digest: ${DIGEST}"
 
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-${{ steps.meta.outputs.tag }}
-          path: sbom.spdx.json
-
-      - name: Cosign sign image by digest
+      - name: Cosign sign promoted image by digest
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
           set -euo pipefail
-          IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
+          IMAGE="${{ steps.meta.outputs.image }}@${{ steps.digest.outputs.digest }}"
           cosign sign --yes "${IMAGE}"
-
-      - name: Cosign attest SBOM
-        env:
-          COSIGN_EXPERIMENTAL: "true"
-        run: |
-          set -euo pipefail
-          IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
-          cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
 
       - name: Update GitOps overlay (staging/prod)
         shell: bash
@@ -120,11 +121,12 @@ jobs:
 
           OVERLAY="${{ steps.meta.outputs.overlay }}"
           FILE="apps/student-reg/k8s/overlays/${OVERLAY}/kustomization.yaml"
-          TAG="${{ steps.meta.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.source_tag }}"
+          IMAGE="${{ steps.meta.outputs.image }}"
 
           echo "Updating overlay: ${OVERLAY}"
           echo "File: ${FILE}"
-          echo "newName -> ${{ steps.meta.outputs.image }}"
+          echo "newName -> ${IMAGE}"
           echo "newTag  -> ${TAG}"
 
           if [[ ! -f "$FILE" ]]; then
@@ -132,21 +134,14 @@ jobs:
             exit 1
           fi
 
-          # Update newName if present (optional)
           if grep -qE "^[[:space:]]*newName:" "$FILE"; then
-            sed -i.bak -E "s|^([[:space:]]*newName:).*|\1 ${{ steps.meta.outputs.image }}|" "$FILE"
+            sed -i.bak -E "s|^([[:space:]]*newName:).*|\1 ${IMAGE}|" "$FILE"
           fi
 
-          # Update newTag (expected to exist)
           if grep -qE "^[[:space:]]*newTag:" "$FILE"; then
             sed -i.bak -E "s|^([[:space:]]*newTag:).*|\1 ${TAG}|" "$FILE"
           else
-            echo "ERROR: newTag not found in $FILE (expected Kustomize images block)."
-            echo "Tip: ensure you have something like:"
-            echo "images:"
-            echo "- name: student-reg"
-            echo "  newName: ghcr.io/<owner>/<repo>"
-            echo "  newTag: dev"
+            echo "ERROR: newTag not found in $FILE"
             exit 1
           fi
 

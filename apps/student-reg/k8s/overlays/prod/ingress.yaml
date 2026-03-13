@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: student-reg
-  namespace: student-reg
+  namespace: student-reg-prod
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:

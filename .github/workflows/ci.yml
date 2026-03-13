@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: ["main"]
+    paths-ignore:
+      - "apps/student-reg/k8s/overlays/dev/**"
   workflow_dispatch: {}
 
 permissions:
@@ -21,9 +23,6 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
-  # -------------------------
-  # 1) SAST: CodeQL (Python)
-  # -------------------------
   codeql:
     name: CodeQL (SAST)
     runs-on: ubuntu-latest
@@ -32,7 +31,8 @@ jobs:
       actions: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -47,9 +47,6 @@ jobs:
       - name: Analyze
         uses: github/codeql-action/analyze@v4
 
-  # -----------------------------------------
-  # 2) Secrets scanning + IaC/K8s scanning
-  # -----------------------------------------
   security-scans:
     name: DevSecOps scans (secrets + IaC/K8s)
     runs-on: ubuntu-latest
@@ -58,7 +55,8 @@ jobs:
       actions: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -83,11 +81,8 @@ jobs:
         with:
           sarif_file: results/results_sarif.sarif
 
-  # --------------------------
-  # 3) Lint + Unit tests
-  # --------------------------
   lint-test:
-    name: Lint + Tests
+    name: Lint + Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: [codeql, security-scans]
     permissions:
@@ -99,14 +94,16 @@ jobs:
         python-version: ["3.11"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r src/requirements.txt
@@ -114,18 +111,14 @@ jobs:
 
       - name: Ensure src on PYTHONPATH
         shell: bash
-        run: |
-          echo "PYTHONPATH=${GITHUB_WORKSPACE}/src" >> "$GITHUB_ENV"
+        run: echo "PYTHONPATH=${GITHUB_WORKSPACE}/src" >> "$GITHUB_ENV"
 
-      - name: Lint (ruff)
+      - name: Ruff
         run: ruff check src
 
-      - name: Tests (pytest)
+      - name: Pytest
         run: pytest -q src/tests --maxfail=1 --disable-warnings
 
-  # ------------------------------------------------------------
-  # 4) Dependency scanning (Python deps) via OWASP Dependency-Check
-  # ------------------------------------------------------------
   dependency-scan:
     name: Dependency scan (OWASP DC)
     runs-on: ubuntu-latest
@@ -135,7 +128,8 @@ jobs:
       actions: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: OWASP Dependency-Check (SARIF)
         uses: dependency-check/Dependency-Check_Action@1.1.0
@@ -155,21 +149,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Listing odc-reports (if it exists):"
-          ls -la odc-reports || true
-
           FILE="$(find odc-reports -maxdepth 4 -type f \( -name "*.sarif" -o -name "*.sarif.json" \) | head -n 1 || true)"
-
           if [[ -z "${FILE}" ]]; then
             echo "found=false" >> "$GITHUB_OUTPUT"
             echo "file=" >> "$GITHUB_OUTPUT"
-            echo "No SARIF found under odc-reports."
-            echo "Searching repository for any SARIF files:"
-            find . -maxdepth 5 -type f \( -name "*.sarif" -o -name "*.sarif.json" \) -print || true
           else
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "file=${FILE}" >> "$GITHUB_OUTPUT"
-            echo "Found SARIF: ${FILE}"
           fi
 
       - name: Upload ODC SARIF
@@ -179,9 +165,6 @@ jobs:
         with:
           sarif_file: ${{ steps.odc_sarif.outputs.file }}
 
-  # ----------------------------------------------------
-  # 5) Build image (PR + main), push only on main
-  # ----------------------------------------------------
   build-image:
     name: Build image (PR/main)
     runs-on: ubuntu-latest
@@ -198,7 +181,8 @@ jobs:
       digest: ${{ steps.buildpush.outputs.digest }}
       pushed: ${{ steps.meta.outputs.pushed }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Compute image metadata
         id: meta
@@ -206,7 +190,6 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::7}"
-
           OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           REPO_LOWER="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
           IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}"
@@ -234,8 +217,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      # PR build (no push)
-      - name: Build image (no push on PR)
+      - name: Build image (PR only, no push)
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
         with:
@@ -243,13 +225,11 @@ jobs:
           file: apps/student-reg/Dockerfile
           push: false
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          tags: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Main build & push
-      - name: Build & push (sha + dev) [main]
+      - name: Build and push image (main only)
         id: buildpush
         if: steps.meta.outputs.pushed == 'true'
         uses: docker/build-push-action@v6
@@ -282,7 +262,7 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
 
-      - name: Generate SBOM (Syft) (main only)
+      - name: Generate SBOM (main only)
         if: steps.meta.outputs.pushed == 'true'
         uses: anchore/sbom-action@v0
         with:
@@ -319,9 +299,6 @@ jobs:
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
 
-  # -------------------------------------------------------
-  # 6) GitOps CD: update dev overlay tag (main only)
-  # -------------------------------------------------------
   gitops-update-dev:
     name: GitOps update dev overlay (main only)
     runs-on: ubuntu-latest
@@ -330,17 +307,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: Update dev overlay image + tag
+      - name: Update dev overlay image and tag
         shell: bash
         run: |
           set -euo pipefail
           FILE="apps/student-reg/k8s/overlays/dev/kustomization.yaml"
-          echo "Updating ${FILE} newName -> ${{ needs.build-image.outputs.image }}"
-          echo "Updating ${FILE} newTag  -> ${{ needs.build-image.outputs.tag }}"
 
           if grep -qE "^[[:space:]]*newName:" "$FILE"; then
             sed -i.bak -E "s|^([[:space:]]*newName:).*|\1 ${{ needs.build-image.outputs.image }}|" "$FILE"
@@ -349,10 +325,11 @@ jobs:
           sed -i.bak -E "s|^([[:space:]]*newTag:).*|\1 ${{ needs.build-image.outputs.tag }}|" "$FILE"
           rm -f "$FILE.bak"
 
-          echo "Result:"
+          echo "Updated ${FILE}:"
           grep -nE "newName:|newTag:" "$FILE" || true
 
-      - name: Commit & push overlay update
+      - name: Commit and push dev overlay update
+        shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"

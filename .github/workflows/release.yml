@@ -200,4 +200,4 @@ jobs:
             gitops
             promotion
           add-paths: |
-            apps/student-reg/k8s/overlays/${{ steps.meta.outputs.overlay }}/kustomization.yaml
+            apps/student-reg/k8s/overlays/dev/kustomization.yaml

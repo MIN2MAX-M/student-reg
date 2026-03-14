@@ -19,7 +19,6 @@ jobs:
   release:
     name: Promote existing CI artifact -> staging/prod
     runs-on: ubuntu-latest
-    environment: ${{ contains(github.ref_name, '-rc') && 'staging' || 'prod' }}
 
     steps:
       - name: Checkout
@@ -28,14 +27,14 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      - name: Determine version, source image, and target overlay
+      - name: Determine version, source image, target overlay, and PR branch
         id: meta
         shell: bash
         run: |
           set -euo pipefail
 
           TAG="${GITHUB_REF#refs/tags/}"      # e.g. v1.2.0 or v1.2.0-rc1
-          SHORT_SHA="${GITHUB_SHA::7}"        # tag target commit short sha
+          SHORT_SHA="${GITHUB_SHA::7}"        # short sha of the tagged commit
 
           OWNER_LOWER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
           REPO_LOWER="$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')"
@@ -184,19 +183,18 @@ jobs:
           commit-message: "chore(gitops): promote ${{ steps.meta.outputs.overlay }} ${{ steps.meta.outputs.tag }}"
           committer: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
-          signoff: false
           branch: ${{ steps.meta.outputs.branch }}
           delete-branch: true
           title: "chore(gitops): promote ${{ steps.meta.outputs.overlay }} ${{ steps.meta.outputs.tag }}"
           body: |
             Automated promotion PR created by the release workflow.
 
-            **Overlay:** `${{ steps.meta.outputs.overlay }}`
-            **Release tag:** `${{ steps.meta.outputs.tag }}`
-            **Source image tag:** `${{ steps.meta.outputs.source_tag }}`
-            **Image:** `${{ steps.meta.outputs.image }}`
+            Target overlay: `${{ steps.meta.outputs.overlay }}`
+            Release tag: `${{ steps.meta.outputs.tag }}`
+            Immutable source image tag: `${{ steps.meta.outputs.source_tag }}`
+            Image: `${{ steps.meta.outputs.image }}`
 
-            This PR updates the GitOps overlay to point to the promoted image.
+            This PR updates the GitOps overlay to point to the already-built immutable image.
           base: main
           labels: |
             gitops

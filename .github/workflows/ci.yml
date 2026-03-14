@@ -383,4 +383,6 @@ jobs:
             gitops
             dev
           add-paths: |
-            apps/student-reg/k8s/overlays/dev/kustomization.yaml
+            - "apps/student-reg/k8s/overlays/dev/kustomization.yaml"
+            - "apps/student-reg/k8s/overlays/staging/**"
+            - "apps/student-reg/k8s/overlays/prod/**"

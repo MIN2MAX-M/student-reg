@@ -1,5 +1,6 @@
 resources:
   - ../../base
+  - namespace.yaml
 
 namespace: student-reg-staging
 
@@ -7,6 +8,3 @@ images:
   - name: ghcr.io/min2max-m/student-reg
     newName: ghcr.io/min2max-m/student-reg
     newTag: sha-c96d3ed
-
-patches:
-  - path: namespace-patch.yaml

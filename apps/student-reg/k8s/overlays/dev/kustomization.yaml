@@ -7,7 +7,7 @@ namespace: student-reg-dev
 images:
   - name: ghcr.io/min2max-m/student-reg
     newName: ghcr.io/min2max-m/student-reg
-    newTag: sha-c96d3ed
+    newTag: sha-07237a2
 
 patches:
   - path: namespace-patch.yaml

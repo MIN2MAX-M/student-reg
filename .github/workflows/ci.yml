@@ -299,7 +299,7 @@ jobs:
           IMAGE="${{ steps.meta.outputs.image }}@${{ steps.buildpush.outputs.digest }}"
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson "${IMAGE}"
 
-    gitops-update-dev:
+  gitops-update-dev:
     name: GitOps update dev overlay (main only)
     runs-on: ubuntu-latest
     needs: build-image

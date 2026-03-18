@@ -3,3 +3,5 @@ resources:
   - grafana.ingress.yaml
   - kiali.ingress.yaml
   - namespace-istio-system.yaml
+  - alertmanager.yaml
+  - prometheus.yaml

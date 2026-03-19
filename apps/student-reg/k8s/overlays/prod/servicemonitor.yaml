@@ -4,7 +4,7 @@ metadata:
   name: student-reg-prod
   namespace: monitoring
   labels:
-    release: kps
+    release: kube-prom-stack
 spec:
   namespaceSelector:
     matchNames:

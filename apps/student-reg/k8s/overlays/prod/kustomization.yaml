@@ -1,6 +1,7 @@
 resources:
   - ../../base
   - ingress.yaml
+  - servicemonitor.yaml
 
 namespace: student-reg-prod
 

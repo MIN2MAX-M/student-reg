@@ -5,7 +5,7 @@ metadata:
   labels:
     app: student-reg
 spec:
-  replicas: 2
+  replicas: 5
   revisionHistoryLimit: 5
   minReadySeconds: 5
   strategy:

@@ -65,14 +65,6 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: pgdata
-        labels:
-          app: postgres
-          component: database
-          environment: dev
-          app.kubernetes.io/name: postgres
-          app.kubernetes.io/component: database
-          app.kubernetes.io/instance: student-reg-dev
-          app.kubernetes.io/part-of: student-reg
       spec:
         accessModes:
           - ReadWriteOnce

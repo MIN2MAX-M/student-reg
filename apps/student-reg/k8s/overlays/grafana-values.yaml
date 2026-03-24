@@ -1,0 +1,13 @@
+grafana:
+  grafana.ini:
+    smtp:
+      enabled: true
+      host: smtp.gmail.com:587
+      user: devilpunisher22@gmail.com
+      password: $__env{GF_SMTP_PASSWORD}
+      from_address: devilpunisher22@gmail.com
+      from_name: Grafana Alerts
+      skip_verify: true
+      startTLS_policy: OpportunisticStartTLS
+
+  envFromSecret: grafana-smtp

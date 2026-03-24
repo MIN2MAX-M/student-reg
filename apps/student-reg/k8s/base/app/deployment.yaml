@@ -4,6 +4,12 @@ metadata:
   name: student-reg
   labels:
     app: student-reg
+    component: api
+    environment: dev
+    app.kubernetes.io/name: student-reg
+    app.kubernetes.io/component: api
+    app.kubernetes.io/instance: student-reg-dev
+    app.kubernetes.io/part-of: student-reg
 spec:
   replicas: 5
   revisionHistoryLimit: 5
@@ -20,6 +26,12 @@ spec:
     metadata:
       labels:
         app: student-reg
+        component: api
+        environment: dev
+        app.kubernetes.io/name: student-reg
+        app.kubernetes.io/component: api
+        app.kubernetes.io/instance: student-reg-dev
+        app.kubernetes.io/part-of: student-reg
     spec:
       serviceAccountName: student-reg-sa
       automountServiceAccountToken: false
@@ -32,8 +44,8 @@ spec:
           image: ghcr.io/min2max-m/student-reg:PLACEHOLDER
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
-              name: http
+            - name: http
+              containerPort: 8000
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -61,9 +73,9 @@ spec:
               path: /health
               port: 8000
             initialDelaySeconds: 5
-            failureThreshold: 20
-            timeoutSeconds: 2
             periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 20
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -71,7 +83,8 @@ spec:
             runAsUser: 10001
             runAsGroup: 10001
             capabilities:
-              drop: ["ALL"]
+              drop:
+                - ALL
           volumeMounts:
             - name: tmp
               mountPath: /tmp

@@ -11,7 +11,7 @@ spec:
     - hosts: ["student-reg.example.com"]
       secretName: student-reg-tls
   rules:
-    - host: student-reg.example.com
+    - host: student-reg.local
       http:
         paths:
           - path: /

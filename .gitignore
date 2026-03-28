@@ -1,6 +1,6 @@
 # Secrets
 .env
-
+*.sql
 # Python
 __pycache__/
 *.py[cod]
